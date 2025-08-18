@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI สร้างคำบรรยายสินค้าและ SEO จากรูปภาพ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Kanit', sans-serif;
+        }
+        .drop-zone {
+            border: 2px dashed #cbd5e1; /* gray-300 */
+            transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+        }
+        .drop-zone.drag-over {
+            background-color: #f0f9ff; /* sky-50 */
+            border-color: #3b82f6; /* blue-500 */
+        }
+        .copy-btn .fa-copy { display: inline-block; }
+        .copy-btn .fa-check { display: none; }
+        .copy-btn.copied .fa-copy { display: none; }
+        .copy-btn.copied .fa-check { display: inline-block; }
+        .loader {
+            border: 4px solid #e5e7eb; /* gray-200 */
+            border-top: 4px solid #3b82f6; /* blue-500 */
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-4xl mx-auto bg-white rounded-2xl shadow-xl p-6 md:p-8">
+        
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-sky-500">AI Product Description & SEO Generator</h1>
+            <p class="text-gray-600 mt-2">อัปโหลดภาพสินค้า แล้วให้ AI ช่วยเขียนคำบรรยายและแท็ก SEO สุดปัง!</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            <!-- Left Panel: Image Upload -->
+            <div class="flex flex-col items-center justify-center">
+                <div id="drop-zone" class="drop-zone w-full h-64 rounded-xl flex flex-col items-center justify-center text-gray-500 cursor-pointer hover:bg-sky-50">
+                    <div id="upload-prompt" class="text-center">
+                        <i class="fas fa-cloud-upload-alt text-4xl mb-4 text-gray-400"></i>
+                        <p class="font-semibold">ลากและวางไฟล์ที่นี่</p>
+                        <p class="text-sm">หรือ <span class="text-blue-500 font-medium">คลิกเพื่ออัปโหลด</span></p>
+                        <p class="text-xs mt-2 text-gray-400">รองรับไฟล์ PNG, JPG, WEBP</p>
+                    </div>
+                    <img id="image-preview" src="" alt="Image Preview" class="hidden w-full h-full object-contain rounded-xl"/>
+                </div>
+                <input type="file" id="file-input" class="hidden" accept="image/png, image/jpeg, image/webp">
+                
+                <button id="generate-btn" disabled class="mt-6 w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg transition-all duration-300 flex items-center justify-center space-x-2 shadow-lg shadow-blue-500/20">
+                    <i class="fas fa-magic"></i>
+                    <span>สร้างคำบรรยาย</span>
+                </button>
+            </div>
+
+            <!-- Right Panel: Results -->
+            <div class="flex flex-col space-y-6">
+                <!-- Loading Indicator -->
+                <div id="loader" class="hidden flex flex-col items-center justify-center h-full text-gray-500">
+                    <div class="loader"></div>
+                    <p class="mt-4">AI กำลังวิเคราะห์รูปภาพ...</p>
+                </div>
+
+                <!-- Error Message -->
+                <div id="error-message" class="hidden bg-red-100 border border-red-400 text-red-800 px-4 py-3 rounded-lg" role="alert">
+                    <strong class="font-bold">เกิดข้อผิดพลาด!</strong>
+                    <span class="block sm:inline" id="error-text">ไม่สามารถสร้างข้อมูลได้ กรุณาลองใหม่อีกครั้ง</span>
+                </div>
+
+                <!-- Results Container -->
+                <div id="results-container" class="hidden flex flex-col space-y-6">
+                    <!-- Product Description -->
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label for="product-description" class="font-semibold text-lg text-gray-700">คำบรรยายสินค้า</label>
+                            <button id="copy-desc-btn" class="copy-btn bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm py-1 px-3 rounded-md transition-colors duration-200 flex items-center space-x-2">
+                                <i class="fas fa-copy"></i>
+                                <i class="fas fa-check text-green-500"></i>
+                                <span class="btn-text">คัดลอก</span>
+                            </button>
+                        </div>
+                        <textarea id="product-description" rows="8" class="w-full p-3 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none" readonly></textarea>
+                    </div>
+                    
+                    <!-- SEO Tags -->
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label for="seo-tags" class="font-semibold text-lg text-gray-700">SEO Tags</label>
+                            <button id="copy-tags-btn" class="copy-btn bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm py-1 px-3 rounded-md transition-colors duration-200 flex items-center space-x-2">
+                                <i class="fas fa-copy"></i>
+                                <i class="fas fa-check text-green-500"></i>
+                                <span class="btn-text">คัดลอก</span>
+                            </button>
+                        </div>
+                        <textarea id="seo-tags" rows="4" class="w-full p-3 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none" readonly></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const uploadPrompt = document.getElementById('upload-prompt');
+        const imagePreview = document.getElementById('image-preview');
+        const generateBtn = document.getElementById('generate-btn');
+        const loader = document.getElementById('loader');
+        const resultsContainer = document.getElementById('results-container');
+        const productDescription = document.getElementById('product-description');
+        const seoTags = document.getElementById('seo-tags');
+        const copyDescBtn = document.getElementById('copy-desc-btn');
+        const copyTagsBtn = document.getElementById('copy-tags-btn');
+        const errorMessage = document.getElementById('error-message');
+        const errorText = document.getElementById('error-text');
+
+        let imageBase64 = null;
+        let imageMimeType = null;
+
+        // --- Event Listeners ---
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) handleFile(files[0]);
+        });
+        fileInput.addEventListener('change', (e) => { if (e.target.files.length > 0) handleFile(e.target.files[0]); });
+        generateBtn.addEventListener('click', generateContent);
+        copyDescBtn.addEventListener('click', () => copyToClipboard(productDescription, copyDescBtn));
+        copyTagsBtn.addEventListener('click', () => copyToClipboard(seoTags, copyTagsBtn));
+
+        // --- Functions ---
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                showError('ไฟล์ที่เลือกไม่ใช่รูปภาพ กรุณาเลือกไฟล์รูปภาพเท่านั้น');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                imageBase64 = reader.result.split(',')[1];
+                imageMimeType = file.type;
+                imagePreview.src = reader.result;
+                imagePreview.classList.remove('hidden');
+                uploadPrompt.classList.add('hidden');
+                generateBtn.disabled = false;
+                resetResults();
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        function resetResults() {
+            resultsContainer.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+            productDescription.value = '';
+            seoTags.value = '';
+        }
+
+        function showError(message) {
+            errorText.textContent = message;
+            errorMessage.classList.remove('hidden');
+            loader.classList.add('hidden');
+            resultsContainer.classList.add('hidden');
+        }
+
+        async function generateContent() {
+            if (!imageBase64) {
+                showError('กรุณาอัปโหลดรูปภาพก่อน');
+                return;
+            }
+
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i><span>กำลังสร้าง...</span>`;
+            loader.classList.remove('hidden');
+            resetResults();
+
+            const prompt = `คุณคือผู้เชี่ยวชาญด้าน E-commerce และนักเขียนคำโฆษณา จากภาพสินค้านี้ โปรดสร้าง:
+1.  คำบรรยายสินค้าที่น่าดึงดูดใจ มีรายละเอียดครบถ้วน เหมาะสำหรับการขายออนไลน์
+2.  รายการแท็ก SEO ที่เกี่ยวข้อง (ประมาณ 5-10 แท็ก) เพื่อช่วยให้ลูกค้าค้นหาสินค้าเจอได้ง่ายขึ้น
+โปรดตอบกลับในรูปแบบ JSON ที่มีโครงสร้างดังนี้: {"description": "<คำบรรยายสินค้า>", "seo_tags": ["<แท็ก1>", "<แท็ก2>", ...]}`;
+
+            const requestPayload = {
+                contents: [{
+                    role: "user",
+                    parts: [
+                        { text: prompt },
+                        { inlineData: { mimeType: imageMimeType, data: imageBase64 } }
+                    ]
+                }],
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            "description": { "type": "STRING" },
+                            "seo_tags": { "type": "ARRAY", "items": { "type": "STRING" } }
+                        },
+                        required: ["description", "seo_tags"]
+                    }
+                }
+            };
+            
+            try {
+                // *** MODIFIED PART: Call our own serverless function ***
+                const functionUrl = '/.netlify/functions/generate';
+                const response = await fetch(functionUrl, {
+                    method: 'POST',
+                    body: JSON.stringify(requestPayload)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `Request failed with status ${response.status}`);
+                }
+
+                const result = await response.json();
+                
+                // The result from our function is the direct response from Gemini
+                if (result.candidates && result.candidates.length > 0) {
+                    const jsonText = result.candidates[0].content.parts[0].text;
+                    displayResults(JSON.parse(jsonText));
+                } else {
+                    throw new Error('Invalid response structure from AI');
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                showError(error.message || 'เกิดข้อผิดพลาดในการสื่อสารกับ AI กรุณาลองใหม่อีกครั้ง');
+            } finally {
+                generateBtn.disabled = false;
+                generateBtn.innerHTML = `<i class="fas fa-magic"></i><span>สร้างคำบรรยาย</span>`;
+                loader.classList.add('hidden');
+            }
+        }
+
+        function displayResults(data) {
+            if (data && data.description && data.seo_tags) {
+                productDescription.value = data.description.trim();
+                seoTags.value = data.seo_tags.join(', ');
+                resultsContainer.classList.remove('hidden');
+            } else {
+                showError('AI ไม่สามารถสร้างข้อมูลที่ถูกต้องได้ กรุณาลองใช้ภาพอื่น');
+            }
+        }
+
+        function copyToClipboard(textarea, button) {
+            textarea.select();
+            textarea.setSelectionRange(0, 99999);
+            try {
+                navigator.clipboard.writeText(textarea.value).then(() => {
+                    showCopySuccess(button);
+                }).catch(err => {
+                    document.execCommand('copy');
+                    showCopySuccess(button);
+                });
+            } catch (err) {
+                console.error('Could not copy text: ', err);
+            }
+        }
+
+        function showCopySuccess(button) {
+            const btnText = button.querySelector('.btn-text');
+            const originalText = btnText.textContent;
+            button.classList.add('copied');
+            btnText.textContent = 'คัดลอกแล้ว!';
+            setTimeout(() => {
+                button.classList.remove('copied');
+                btnText.textContent = originalText;
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
