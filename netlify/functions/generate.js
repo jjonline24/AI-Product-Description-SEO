@@ -25,7 +25,7 @@ exports.handler = async function(event) {
             };
         }
 
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
 
         // Make the actual request to the Gemini API
         const geminiResponse = await fetch(apiUrl, {
@@ -62,4 +62,5 @@ exports.handler = async function(event) {
         };
     }
 };
+
 
